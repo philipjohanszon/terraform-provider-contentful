@@ -1609,7 +1609,6 @@ components:
           $ref: '#/components/schemas/SystemPropertiesResource'
       required:
         - name
-        - displayField
         - fields
         - sys
 
@@ -1660,7 +1659,6 @@ components:
           type: string
       required:
         - name
-        - displayField
         - fields
 
     ContentTypeUpdate:
@@ -1681,7 +1679,6 @@ components:
           type: string
       required:
         - name
-        - displayField
         - fields
 
 
@@ -3447,7 +3444,6 @@ components:
       required:
         - name
         - sys
-        - description
         - configurations
 
 
@@ -3468,7 +3464,6 @@ components:
 
       required:
         - name
-        - description
         - configurations
 
     Error:

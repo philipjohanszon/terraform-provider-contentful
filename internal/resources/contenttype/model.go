@@ -7,7 +7,6 @@ import (
 	"github.com/elliotchance/pie/v2"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-
 	"github.com/labd/terraform-provider-contentful/internal/sdk"
 	"github.com/labd/terraform-provider-contentful/internal/utils"
 )
@@ -39,24 +38,57 @@ type Field struct {
 }
 
 type DefaultValue struct {
-	Bool   types.Map `tfsdk:"bool"`
-	String types.Map `tfsdk:"string"`
+	Bool   types.Map             `tfsdk:"bool"`
+	String types.Map             `tfsdk:"string"`
+	Array  map[string]types.List `tfsdk:"array"`
+}
+
+// HasContent checks if the DefaultValue has any actual content
+func (d *DefaultValue) HasContent() bool {
+	if d == nil {
+		return false
+	}
+
+	// Check if String map has content
+	if !d.String.IsNull() && !d.String.IsUnknown() && len(d.String.Elements()) > 0 {
+		return true
+	}
+
+	// Check if Bool map has content
+	if !d.Bool.IsNull() && !d.Bool.IsUnknown() && len(d.Bool.Elements()) > 0 {
+		return true
+	}
+
+	// Check if Array map has content
+	if d.Array != nil {
+		return true
+	}
+
+	return false
 }
 
 func (d *DefaultValue) Draft() *map[string]any {
 	var defaultValues = map[string]any{}
 
 	if !d.String.IsNull() && !d.String.IsUnknown() {
-
 		for k, v := range d.String.Elements() {
 			defaultValues[k] = v.(types.String).ValueString()
 		}
 	}
 
 	if !d.Bool.IsNull() && !d.Bool.IsUnknown() {
-
 		for k, v := range d.Bool.Elements() {
 			defaultValues[k] = v.(types.Bool).ValueBool()
+		}
+	}
+
+	if d.Array != nil {
+		for k, v := range d.Array {
+			values := make([]string, 0, len(v.Elements()))
+			for _, item := range v.Elements() {
+				values = append(values, item.(types.String).ValueString())
+			}
+			defaultValues[k] = values
 		}
 	}
 
@@ -83,14 +115,15 @@ type Validation struct {
 }
 
 func (v Validation) Draft() (*sdk.FieldValidation, error) {
-
 	base := &sdk.FieldValidation{
 		Message: v.Message.ValueStringPointer(),
 	}
 
+	var counter = 0
+
 	if !v.Unique.IsUnknown() && !v.Unique.IsNull() {
 		base.Unique = v.Unique.ValueBoolPointer()
-		return base, nil
+		counter++
 	}
 
 	if v.Size != nil {
@@ -98,7 +131,7 @@ func (v Validation) Draft() (*sdk.FieldValidation, error) {
 			Min: v.Size.Min.ValueFloat64Pointer(),
 			Max: v.Size.Max.ValueFloat64Pointer(),
 		}
-		return base, nil
+		counter++
 	}
 
 	if v.Range != nil {
@@ -106,7 +139,7 @@ func (v Validation) Draft() (*sdk.FieldValidation, error) {
 			Min: v.Range.Min.ValueFloat64Pointer(),
 			Max: v.Range.Max.ValueFloat64Pointer(),
 		}
-		return base, nil
+		counter++
 	}
 
 	if v.AssetFileSize != nil {
@@ -114,14 +147,14 @@ func (v Validation) Draft() (*sdk.FieldValidation, error) {
 			Min: v.AssetFileSize.Min.ValueFloat64Pointer(),
 			Max: v.AssetFileSize.Max.ValueFloat64Pointer(),
 		}
-		return base, nil
+		counter++
 	}
 
 	if v.Regexp != nil {
 		base.Regexp = &sdk.RegexValidationValue{
 			Pattern: v.Regexp.Pattern.ValueString(),
 		}
-		return base, nil
+		counter++
 	}
 
 	if v.LinkContentType != nil {
@@ -129,7 +162,7 @@ func (v Validation) Draft() (*sdk.FieldValidation, error) {
 			return t.ValueString()
 		})
 		base.LinkContentType = &value
-		return base, nil
+		counter++
 	}
 
 	if v.LinkMimetypeGroup != nil {
@@ -137,7 +170,7 @@ func (v Validation) Draft() (*sdk.FieldValidation, error) {
 			return t.ValueString()
 		})
 		base.LinkMimetypeGroup = &value
-		return base, nil
+		counter++
 	}
 
 	if v.In != nil {
@@ -145,7 +178,7 @@ func (v Validation) Draft() (*sdk.FieldValidation, error) {
 			return t.ValueString()
 		})
 		base.In = &value
-		return base, nil
+		counter++
 	}
 
 	if v.EnabledMarks != nil {
@@ -153,7 +186,7 @@ func (v Validation) Draft() (*sdk.FieldValidation, error) {
 			return t.ValueString()
 		})
 		base.EnabledMarks = &value
-		return base, nil
+		counter++
 	}
 
 	if v.EnabledNodeTypes != nil {
@@ -161,16 +194,24 @@ func (v Validation) Draft() (*sdk.FieldValidation, error) {
 			return t.ValueString()
 		})
 		base.EnabledNodeTypes = &value
-		return base, nil
+		counter++
 	}
 
 	if v.Nodes != nil {
 		value := v.Nodes.Draft()
 		base.Nodes = value
-		return base, nil
+		counter++
 	}
 
-	return nil, fmt.Errorf("unsupported validation used, %s. Please implement", reflect.TypeOf(v).String())
+	if counter == 0 {
+		return nil, fmt.Errorf("at least one validation property must be set")
+	}
+
+	if counter > 1 {
+		return nil, fmt.Errorf("only one validation property per rule can be set, got %d", counter)
+	}
+
+	return base, nil
 }
 
 type Size struct {
@@ -544,10 +585,10 @@ func (f *Field) Equal(n sdk.Field) bool {
 
 func createValidations(validations []Validation) ([]sdk.FieldValidation, error) {
 	var contentfulValidations []sdk.FieldValidation
-	for _, validation := range validations {
+	for i, validation := range validations {
 		value, err := validation.Draft()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create validation at index %d: %w", i, err)
 		}
 		contentfulValidations = append(contentfulValidations, *value)
 	}
@@ -558,7 +599,7 @@ func (f *Field) ToNative() (*sdk.Field, error) {
 
 	validations, err := createValidations(f.Validations)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create validations for field %s: %w", f.Id.ValueString(), err)
 	}
 
 	contentfulField := &sdk.Field{
@@ -586,7 +627,7 @@ func (f *Field) ToNative() (*sdk.Field, error) {
 		contentfulField.Items = items
 	}
 
-	if f.DefaultValue != nil {
+	if f.DefaultValue != nil && f.DefaultValue.HasContent() {
 		contentfulField.DefaultValue = f.DefaultValue.Draft()
 	}
 
@@ -609,8 +650,11 @@ func getTypeOfMap(mapValues *map[string]any) (*string, error) {
 		case float64:
 			t := "float64"
 			return &t, nil
+		case []interface{}:
+			t := "[]interface{}"
+			return &t, nil
 		default:
-			return nil, fmt.Errorf("The default type %T is not supported by the provider", c)
+			return nil, fmt.Errorf("the default type %T is not supported by the provider", c)
 		}
 	}
 
@@ -665,6 +709,20 @@ func (f *Field) Import(n sdk.Field) error {
 			}
 
 			f.DefaultValue.Bool = types.MapValueMust(types.BoolType, boolMap)
+		case "[]interface{}":
+			arrayMap := map[string]types.List{}
+
+			for k, v := range *n.DefaultValue {
+				var values []attr.Value
+
+				for _, item := range v.([]interface{}) {
+					values = append(values, types.StringValue(item.(string)))
+				}
+
+				arrayMap[k] = types.ListValueMust(types.StringType, values)
+			}
+
+			f.DefaultValue.Array = arrayMap
 		}
 
 	}
@@ -827,7 +885,7 @@ func (c *ContentType) Create() (*sdk.ContentTypeCreate, error) {
 
 	contentfulType := &sdk.ContentTypeCreate{
 		Name:         c.Name.ValueString(),
-		DisplayField: c.DisplayField.ValueString(),
+		DisplayField: c.DisplayField.ValueStringPointer(),
 		Fields:       fields,
 	}
 
@@ -853,7 +911,7 @@ func (c *ContentType) Update() (*sdk.ContentTypeUpdate, error) {
 
 	contentfulType := &sdk.ContentTypeUpdate{
 		Name:         c.Name.ValueString(),
-		DisplayField: c.DisplayField.ValueString(),
+		DisplayField: c.DisplayField.ValueStringPointer(),
 		Fields:       fields,
 	}
 
@@ -871,7 +929,7 @@ func (c *ContentType) Import(n *sdk.ContentType) error {
 	c.Description = types.StringPointerValue(n.Description)
 
 	c.Name = types.StringValue(n.Name)
-	c.DisplayField = types.StringValue(n.DisplayField)
+	c.DisplayField = types.StringPointerValue(n.DisplayField)
 
 	var fields []Field
 
@@ -900,7 +958,7 @@ func (c *ContentType) Equal(n *sdk.ContentType) bool {
 		return false
 	}
 
-	if c.DisplayField.ValueString() != n.DisplayField {
+	if c.DisplayField.ValueStringPointer() != n.DisplayField {
 		return false
 	}
 

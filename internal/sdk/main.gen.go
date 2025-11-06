@@ -562,7 +562,7 @@ type ContentType struct {
 	Description *string `json:"description,omitempty"`
 
 	// DisplayField ID of the field to use as the display field
-	DisplayField string  `json:"displayField"`
+	DisplayField *string `json:"displayField,omitempty"`
 	Fields       []Field `json:"fields"`
 
 	// Name Name of the content type
@@ -596,7 +596,7 @@ type ContentTypeCreate struct {
 	Description *string `json:"description,omitempty"`
 
 	// DisplayField ID of the field to use as the display field
-	DisplayField string  `json:"displayField"`
+	DisplayField *string `json:"displayField,omitempty"`
 	Fields       []Field `json:"fields"`
 
 	// Name Name of the content type
@@ -609,7 +609,7 @@ type ContentTypeUpdate struct {
 	Description *string `json:"description,omitempty"`
 
 	// DisplayField ID of the field to use as the display field
-	DisplayField string  `json:"displayField"`
+	DisplayField *string `json:"displayField,omitempty"`
 	Fields       []Field `json:"fields"`
 
 	// Name Name of the content type
@@ -1140,7 +1140,7 @@ type PreviewEnvironment struct {
 	Configurations []PreviewConfiguration `json:"configurations"`
 
 	// Description Description of the preview environment
-	Description string `json:"description"`
+	Description *string `json:"description,omitempty"`
 
 	// Name Name of the preview environment
 	Name string                             `json:"name"`
@@ -1153,7 +1153,7 @@ type PreviewEnvironmentInput struct {
 	Configurations []PreviewConfiguration `json:"configurations"`
 
 	// Description Description of the preview environment
-	Description string `json:"description"`
+	Description *string `json:"description,omitempty"`
 
 	// Name Name of the preview environment
 	Name string `json:"name"`

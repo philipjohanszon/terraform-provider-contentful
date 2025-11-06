@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
+
 	"github.com/cenkalti/backoff/v5"
 	"github.com/elliotchance/pie/v2"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -244,7 +245,7 @@ func (e *contentTypeResource) Schema(ctx context.Context, request resource.Schem
 	}
 
 	response.Schema = schema.Schema{
-		Description: "Todo for explaining contenttype",
+		MarkdownDescription: "A content type consists of a set of fields and other information, read [this guide](https://www.contentful.com/developers/docs/concepts/data-model/) to learn more about modeling your content.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Optional:    true,
@@ -360,16 +361,29 @@ func (e *contentTypeResource) Schema(ctx context.Context, request resource.Schem
 							},
 						},
 						"default_value": schema.SingleNestedAttribute{
-							Optional: true,
+							Optional:    true,
+							Description: "Default value for the field. Use 'string' for text values or 'bool' for boolean values, with locale keys.",
 							Attributes: map[string]schema.Attribute{
 								"bool": schema.MapAttribute{
 									ElementType: types.BoolType,
 									Optional:    true,
+									Description: "Boolean default values by locale. Example: {\"en-US\" = true}",
 								},
 								"string": schema.MapAttribute{
 									ElementType: types.StringType,
 									Optional:    true,
+									Description: "String default values by locale. Example: {\"en-US\" = \"green\"}",
 								},
+								"array": schema.MapAttribute{
+									ElementType: types.ListType{
+										ElemType: types.StringType,
+									},
+									Optional:    true,
+									Description: "Array default values by locale. Example: {\"en-US\" = [\"green\", \"blue\"]",
+								},
+							},
+							Validators: []validator.Object{
+								customvalidator.DefaultValueStructure(),
 							},
 						},
 					},
